@@ -1,7 +1,5 @@
 from django.db import models
 
-
-#Se crean los modelos para los clientes
 class Cliente(models.Model):
     tipo = models.CharField(
         max_length=50,
@@ -10,11 +8,11 @@ class Cliente(models.Model):
             ('empresa', 'Empresa')
         ],
         default='natural')
-    nombre = models.CharField(max_length=100) # Nombre del cliente
-    telefono = models.CharField(max_length=20, blank=True, null=True) # Telefono del cliente
-    email = models.EmailField(unique=True) # Email del cliente
-    empresa = models.CharField(max_length=100, blank=True, null=True) # Empresa del cliente
-    #estado del cliente
+    nombre = models.CharField(max_length=100) 
+    telefono = models.CharField(max_length=20, blank=True, null=True) 
+    email = models.EmailField(unique=True) 
+    empresa = models.CharField(max_length=100, blank=True, null=True) 
+ 
     estado = models.CharField(
         max_length=50,
         choices=[
@@ -24,9 +22,20 @@ class Cliente(models.Model):
         ],
         default='potencial'
     )
-    ciudad = models.CharField(max_length=100, blank=True, null=True) # Ciudad del cliente
-    fecha_registro = models.DateField(auto_now_add=True) # Fecha de registro del cliente
-    notas = models.TextField(blank=True, null=True) # Notas adicionales sobre el cliente
+    ciudad = models.CharField(max_length=100, blank=True, null=True) 
+    origen = models.CharField(
+        max_length=50,
+        choices=[
+            ('web', 'Sitio Web'),
+            ('whatsapp', 'WhatsApp Directo'),
+            ('redes', 'Redes Sociales'),
+            ('referido', 'Referido'),
+            ('otro', 'Otro')
+        ],
+        default='otro'
+    )
+    fecha_registro = models.DateField(auto_now_add=True) 
+    notas = models.TextField(blank=True, null=True) 
 
     def __str__(self):
-        return f"{self.nombre} ({self.email})" # como se muestra el cliente en el admin
+        return f"{self.nombre} ({self.email})" 

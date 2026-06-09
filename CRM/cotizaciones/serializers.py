@@ -21,7 +21,7 @@ class QuotationSerializer(serializers.ModelSerializer):
 
         for item in items_data:
             CotizacionItem.objects.create(
-                quotation=quotation,
+                cotizacion=quotation,
                 **item
             )
 

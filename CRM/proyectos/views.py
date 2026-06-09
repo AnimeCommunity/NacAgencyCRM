@@ -1,10 +1,10 @@
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.permissions import IsAuthenticated
-from .models import Project
+from .models import Proyecto
 from .serializers import ProjectSerializer, ProjectDetailSerializer
 
 class ProjectViewSet(ModelViewSet):
-    queryset = Project.objects.select_related('client', 'responsible')
+    queryset = Proyecto.objects.select_related('cliente', 'responsable')
     permission_classes = [IsAuthenticated]
 
     def get_serializer_class(self):

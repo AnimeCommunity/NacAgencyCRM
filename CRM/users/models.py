@@ -16,7 +16,7 @@ class User(AbstractUser):
     )
 
     # is_active ya viene en AbstractUser
-    # username, email, password también
+    # username, email, password tambien
 
     def __str__(self):
         return f"{self.username} ({self.role})"

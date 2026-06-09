@@ -11,5 +11,5 @@ class ClientSerializer(serializers.ModelSerializer):
 class ClientDetailSerializer(ClientSerializer):
     projects_count = serializers.IntegerField(read_only=True)
 
-    class Meta(ClientSerializer.Meta):
-        fields = ClientSerializer.Meta.fields + ['projects_count']
+    # class Meta(ClientSerializer.Meta):
+    #     fields = ClientSerializer.Meta.fields + ['projects_count']

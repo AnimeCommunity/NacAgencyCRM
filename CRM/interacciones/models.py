@@ -1,21 +1,30 @@
 from django.db import models
 from clientes.models import Cliente
+from django.conf import settings
 
-# Modelo para las interacciones con los clientes
+
 class Interaccion(models.Model):
-    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='interacciones') # Relacion con el cliente
-    # Tipo de interaccion
-    tipo = models.CharField(
-        max_length=50,
-        choices=[
-            ('llamada', 'Llamada'),
-            ('correo', 'Correo'),
-            ('reunión', 'Reunión'),
-            ('seguimiento', 'Seguimiento')
-        ]
+    TIPO_CHOICES = [
+        ('llamada', 'Llamada'),
+        ('correo_manual', 'Correo Manual'),
+        ('reunión', 'Reunión'),
+        ('seguimiento', 'Seguimiento'),
+        ('email_marketing', 'Campaña de Email (Automatizada)'), 
+        ('whatsapp_link', 'Enlace de WhatsApp Generado'),        
+    ]
+    
+    cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='interacciones')
+    tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
+    descripcion = models.TextField() 
+    fecha = models.DateTimeField(auto_now_add=True)
+    
+    
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True
     )
-    descripcion = models.TextField() # Descripcion de la interaccion
-    fecha = models.DateTimeField(auto_now_add=True) # Fecha de la interaccion
 
     def __str__(self):
-        return f"{self.tipo} - {self.cliente.nombre}" # como se muestra la interaccion en el admin
+        return f"{self.tipo} - {self.cliente.nombre} ({self.fecha.strftime('%Y-%m-%d')})"

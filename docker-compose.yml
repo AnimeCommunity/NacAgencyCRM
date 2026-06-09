@@ -1,0 +1,31 @@
+
+
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_DB: crm_anc
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: root
+
+  backend:
+    build: ./CRM
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./CRM:/code
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+  frontend:
+    build: ./frontendcrm
+    command: npm run dev
+    volumes:
+      - ./frontendcrm:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    environment:
+      - WATCHPACK_POLLING=true

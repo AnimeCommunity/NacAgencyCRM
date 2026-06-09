@@ -1,10 +1,11 @@
 from django.db import models
+from django.conf import settings
 
 # Create your models here.
 class Proyecto(models.Model):
     cliente = models.ForeignKey('clientes.Cliente', on_delete=models.CASCADE, related_name='proyectos')  # Relacion con el cliente
     nombre = models.CharField(max_length=200)
-    descripción = models.TextField()
+    descripcion = models.TextField()
     tipo_evento = models.CharField(
         max_length=50,
         choices=[
@@ -29,6 +30,6 @@ class Proyecto(models.Model):
             ('finalizado', 'Finalizado'),
             ('cancelado', 'Cancelado')
         ],
-        default='propuesta') 
-    #responsable 
+        default='propuesta')  
+    responsable = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='proyectos_asignados')
     created_at = models.DateTimeField(auto_now_add=True)

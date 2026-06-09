@@ -1,21 +1,25 @@
 from rest_framework import serializers
-from .models import Project
+
+from clientes.models import Cliente
+from users.models import User
+from .models import Proyecto
 from clientes.serializers import ClientSerializer
 from users.serializers import UserSerializer
 
+
 class ProjectSerializer(serializers.ModelSerializer):
-    client = serializers.PrimaryKeyRelatedField(read_only=False)
-    responsible = serializers.PrimaryKeyRelatedField(read_only=False)
+    cliente = serializers.PrimaryKeyRelatedField(queryset=Cliente.objects.all())
+    responsable = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
 
     class Meta:
-        model = Project
+        model = Proyecto
         fields = '__all__'
         read_only_fields = ['id', 'created_at']
 
 class ProjectDetailSerializer(serializers.ModelSerializer):
-    client = ClientSerializer(read_only=True)
-    responsible = UserSerializer(read_only=True)
+    cliente = ClientSerializer(read_only=True)
+    responsable = UserSerializer(read_only=True)
 
     class Meta:
-        model = Project
+        model = Proyecto
         fields = '__all__'

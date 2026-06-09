@@ -2,12 +2,12 @@ from rest_framework.test import APITestCase
 from django.urls import reverse
 from clientes.models import Cliente
 
-# Pruebas de integración para el flujo de clientes
+
 class ClienteIntegrationTest(APITestCase):
-    # Configuración inicial para las pruebas
+
     def test_crear_cliente(self):
         """Prueba que se pueda crear un cliente via API"""
-        url = reverse('cliente-list')  # el router crea esta ruta automáticamente
+        url = reverse('cliente-list')
         data = {
             "nombre": "Pedro Ruiz",
             "telefono": "3012223344",
