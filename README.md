@@ -108,15 +108,15 @@ docker-compose down
 
 ---
 
-## Autor
+## Autor『アニオック』
 
 Este proyecto ha sido desarrollado y es mantenido por:
 
-*   **Daniel Santiago Pineda Garnica**
-    *   Correo electrónico: [tu.email@ejemplo.com](mailto:dspinedaga@unad.com)
-    *   LinkedIn: [@tu-usuario](https://co.linkedin.com/in/daniel-santiago-pineda-garnica-ab214894)
-    *   GitHub: [@tu-usuario](https://github.com/AnimeCommunity)
-    *   Portafolio / Web: [tudominio.com](https://aniokku.netlify.app/)
+*   **Daniel Santiago Pineda Garnica** >_ Aniokku
+    *   Correo electrónico: [dspinedaga@unadvirtual.edu.co](mailto:dspinedaga@unad.com)
+    *   LinkedIn: [Daniel Santiago Pineda G](https://co.linkedin.com/in/daniel-santiago-pineda-garnica-ab214894)
+    *   GitHub: [@AnimeCommunity](https://github.com/AnimeCommunity)
+    *   Portafolio / Web: [aniokku](https://aniokku.netlify.app/)
 
 ---
 
