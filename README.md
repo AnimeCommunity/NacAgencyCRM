@@ -122,4 +122,4 @@ Este proyecto ha sido desarrollado y es mantenido por:
 
 ## 📄 Licencia
 
-Este proyecto está bajo la Licencia [MIT](LICENSE) (o la que consideres adecuada para tu proyecto).
+Este proyecto está bajo la Licencia [MIT](LICENSE).
