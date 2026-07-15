@@ -23,7 +23,7 @@ Antes de empezar, asegúrate de tener instalado en tu máquina:
 
 ---
 
-## ⚙️ Configuración y Despliegue
+## Configuración y Despliegue
 
 Sigue estos pasos para clonar el proyecto y ponerlo en marcha:
 
