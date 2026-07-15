@@ -120,6 +120,6 @@ Este proyecto ha sido desarrollado y es mantenido por:
 
 ---
 
-## 📄 Licencia
+## Licencia
 
 Este proyecto está bajo la Licencia [MIT](LICENSE).
