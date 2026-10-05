@@ -1,27 +1,34 @@
-# crm/urls.py (Tu archivo principal unificado)
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from users.views import UserViewSet
-from clientes.views import ClientViewSet
-from proyectos.views import ProjectViewSet
+from rest_framework_simplejwt.views import TokenRefreshView
+
+from clientes.views import ClienteViewSet
 from cotizaciones.views import QuotationViewSet
 from interacciones.views import InteractionViewSet
-from marketing.views import PlantillaMensajeViewSet, ConfigSMTPViewSet
-from proyectos.reports_views import InformeGerencialView # 👈 Importamos tu vista de reportes
+from marketing.views import ConfigSMTPViewSet, PlantillaMensajeViewSet
+from proyectos.reports_views import InformeGerencialView
+from proyectos.views import ProjectViewSet
+from users.views import CRMTokenObtainPairView, LogoutView, RegisterView, UserViewSet
 
 router = DefaultRouter()
-router.register(r'users', UserViewSet)
-router.register(r'clients', ClientViewSet)
-router.register(r'projects', ProjectViewSet)
-router.register(r'quotations', QuotationViewSet)
-router.register(r'interactions', InteractionViewSet)
-router.register(r'marketing-templates', PlantillaMensajeViewSet)
-router.register(r'marketing-config', ConfigSMTPViewSet)
+router.register(r"users", UserViewSet)
+router.register(r"clients", ClienteViewSet)
+router.register(r"projects", ProjectViewSet)
+router.register(r"quotations", QuotationViewSet)
+router.register(r"interactions", InteractionViewSet)
+router.register(r"marketing-templates", PlantillaMensajeViewSet)
+router.register(r"marketing-config", ConfigSMTPViewSet)
 
 urlpatterns = [
-    path('', include(router.urls)),
-    path('marketing/', include('marketing.urls')), 
-    
-    # ruta para el informe 
-    path('reports/gerencial/', InformeGerencialView.as_view(), name='informe-gerencial'),
+    path("api/token/", CRMTokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("api/register/", RegisterView.as_view(), name="register"),
+    path("api/logout/", LogoutView.as_view(), name="logout"),
+    path("api/", include(router.urls)),
+    path("api/marketing/", include("marketing.urls")),
+    path(
+        "api/reports/gerencial/",
+        InformeGerencialView.as_view(),
+        name="informe-gerencial",
+    ),
 ]

@@ -1,12 +1,19 @@
-from rest_framework.test import APITestCase
 from django.urls import reverse
+from rest_framework.test import APITestCase
+
 from clientes.models import Cliente
 from interacciones.models import Interaccion
+from users.models import User
 
-# Pruebas de integración para el flujo de interacciones
+
 class InteraccionFlowTest(APITestCase):
-    # Configuración inicial para las pruebas
     def setUp(self):
+        self.user = User.objects.create_user(
+            username="sales-interacciones",
+            password="StrongPass!123",
+            role="sales",
+        )
+        self.client.force_authenticate(self.user)
         self.cliente = Cliente.objects.create(
             nombre="Maria Torres",
             email="maria@example.com",

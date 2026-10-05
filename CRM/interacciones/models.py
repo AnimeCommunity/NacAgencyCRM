@@ -16,7 +16,7 @@ class Interaccion(models.Model):
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='interacciones')
     tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
     descripcion = models.TextField() 
-    fecha = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
     
     
     created_by = models.ForeignKey(
@@ -27,4 +27,4 @@ class Interaccion(models.Model):
     )
 
     def __str__(self):
-        return f"{self.tipo} - {self.cliente.nombre} ({self.fecha.strftime('%Y-%m-%d')})"
+        return f"{self.get_tipo_display()} - {self.cliente.nombre} ({self.created_at:%Y-%m-%d})"

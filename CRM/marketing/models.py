@@ -38,11 +38,25 @@ class PlantillaMensaje(models.Model):
         return f"{self.nombre} ({self.get_tipo_display()})"
 
 class ConfigSMTP(models.Model):
+    singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
     email_usuario = models.EmailField(max_length=150, help_text="Correo desde el que se enviarán los mensajes")
-    email_password = models.CharField(max_length=255, help_text="Contraseña o Token de aplicación")
+    email_password = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Se conserva vacío; el secreto se carga desde CRM_SMTP_PASSWORD.",
+    )
     servidor_host = models.CharField(max_length=100, default="smtp.gmail.com")
     puerto = models.IntegerField(default=587)
     use_tls = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(singleton_key=1),
+                name="marketing_configsmtp_singleton_key_is_one",
+            )
+        ]
 
     def __str__(self):
         return f"Configuración SMTP: {self.email_usuario}"

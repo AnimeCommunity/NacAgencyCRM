@@ -1,154 +1,171 @@
-from rest_framework.viewsets import ModelViewSet
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from django.core.mail import get_connection, EmailMessage
+import logging
 import urllib.parse
+
+from django.conf import settings
+from django.core.mail import EmailMessage, get_connection
 from django.db.models import Count, Sum
-from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import ModelViewSet
+
+from CRM.permissions import RolePermission
 from clientes.models import Cliente
-from proyectos.models import Proyecto
 from cotizaciones.models import Cotizacion
-
 from interacciones.models import Interaccion
-from .models import PlantillaMensaje, ConfigSMTP
-from .serializers import PlantillaMensajeSerializer, ConfigSMTPSerializer
+from proyectos.models import Proyecto
+from .models import ConfigSMTP, PlantillaMensaje
+from .serializers import ConfigSMTPSerializer, PlantillaMensajeSerializer
+from .utils import exportar_clientes_excel
 
-# CRUD para las plantillas de mensajes
+
+logger = logging.getLogger(__name__)
+
+
 class PlantillaMensajeViewSet(ModelViewSet):
-    queryset = PlantillaMensaje.objects.all()
+    queryset = PlantillaMensaje.objects.all().order_by("-created_at")
     serializer_class = PlantillaMensajeSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RolePermission]
+    role_permissions = {
+        "list": {"sales", "production"},
+        "retrieve": {"sales", "production"},
+        "create": {"sales"},
+        "update": {"sales"},
+        "partial_update": {"sales"},
+        "destroy": {"sales"},
+    }
 
-# CRUD para la configuración SMTP
+
 class ConfigSMTPViewSet(ModelViewSet):
     queryset = ConfigSMTP.objects.all()
     serializer_class = ConfigSMTPSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RolePermission]
+    role_permissions = {"*": {"admin"}}
 
-# endpoint para procesar y disparar los envíos
+
 class EnviarCampanaView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RolePermission]
+    role_permissions = {"POST": {"sales"}}
 
     def post(self, request):
-        cliente_id = request.data.get('cliente_id')
-        plantilla_id = request.data.get('plantilla_id')
+        try:
+            cliente = Cliente.objects.get(id=request.data.get("cliente_id"))
+            plantilla = PlantillaMensaje.objects.get(id=request.data.get("plantilla_id"))
+        except (Cliente.DoesNotExist, PlantillaMensaje.DoesNotExist):
+            return Response({"error": "Cliente o plantilla no encontrados."}, status=404)
 
         try:
-            cliente = Cliente.objects.get(id=cliente_id)
-            plantilla = PlantillaMensaje.objects.get(id=plantilla_id)
-        except (Cliente.DoesNotExist, PlantillaMensaje.DoesNotExist):
-            return Response({"error": "Cliente o Plantilla no encontrados"}, status=404)
-
-        cuerpo_personalizado = plantilla.contenido.format(nombre=cliente.nombre)
-
-        # email marketing via SMTP
-        if plantilla.tipo == 'email':
-            config = ConfigSMTP.objects.first()
-            if not config:
-                return Response({"error": "No se han configurado los datos de SMTP en el CRM"}, status=400)
-
-            try:
-                connection = get_connection(
-                    backend='django.core.mail.backends.smtp.EmailBackend',
-                    host=config.servidor_host,
-                    port=config.puerto,
-                    username=config.email_usuario,
-                    password=config.email_password,
-                    use_tls=config.use_tls
-                )
-                
-                email = EmailMessage(
-                    subject=plantilla.asunto,
-                    body=cuerpo_personalizado,
-                    from_email=config.email_usuario,
-                    to=[cliente.email],
-                    connection=connection
-                )
-                email.send()
-
-                # Historial
-                Interaccion.objects.create(
-                    cliente=cliente,
-                    tipo='email_marketing',
-                    descripcion=f"Asunto: {plantilla.asunto}\n\nCuerpo:\n{cuerpo_personalizado}",
-                    created_by=request.user
-                )
-                return Response({"status": "Email enviado e indexado con éxito."})
-            except Exception as e:
-                return Response({"error": f"Error de conexión SMTP: {str(e)}"}, status=500)
-
-        # wasa
-        elif plantilla.tipo == 'whatsapp':
-            if not cliente.telefono:
-                return Response({"error": "El cliente no tiene teléfono registrado"}, status=400)
-            
-            telefono_limpio = ''.join(filter(str.isdigit, cliente.telefono))
-            mensaje_parseado = urllib.parse.quote(cuerpo_personalizado)
-            whatsapp_url = f"https://wa.me/{telefono_limpio}?text={mensaje_parseado}"
-
-            # historial
-            Interaccion.objects.create(
-                cliente=cliente,
-                tipo='whatsapp_link',
-                descripcion=f"Se generó link de WhatsApp con el mensaje: {cuerpo_personalizado}",
-                created_by=request.user
+            body = plantilla.contenido.format(nombre=cliente.nombre)
+        except (KeyError, ValueError):
+            return Response(
+                {"error": "La plantilla contiene variables no compatibles."}, status=400
             )
-            return Response({"status": "URL generada", "url": whatsapp_url})
+
+        if plantilla.tipo == "email":
+            return self._send_email(request, cliente, plantilla, body)
+        if plantilla.tipo == "whatsapp":
+            return self._create_whatsapp_link(request, cliente, body)
+        return Response({"error": "Tipo de plantilla no soportado."}, status=400)
+
+    def _send_email(self, request, cliente, plantilla, body):
+        config = ConfigSMTP.objects.first()
+        if not config:
+            return Response({"error": "No existe configuración SMTP."}, status=400)
+
+        allowed_hosts = set(getattr(settings, "CRM_SMTP_ALLOWED_HOSTS", []))
+        if config.servidor_host not in allowed_hosts:
+            return Response(
+                {"error": "El servidor SMTP no está permitido por la configuración."},
+                status=400,
+            )
+
+        password = getattr(settings, "CRM_SMTP_PASSWORD", "")
+        if not password:
+            return Response({"error": "La contraseña SMTP no está configurada."}, status=400)
+
+        try:
+            connection = get_connection(
+                backend="django.core.mail.backends.smtp.EmailBackend",
+                host=config.servidor_host,
+                port=config.puerto,
+                username=config.email_usuario,
+                password=password,
+                use_tls=config.use_tls,
+                timeout=10,
+            )
+            email = EmailMessage(
+                subject=plantilla.asunto or plantilla.nombre,
+                body=body,
+                from_email=config.email_usuario,
+                to=[cliente.email],
+                connection=connection,
+            )
+            email.send(fail_silently=False)
+        except Exception:
+            logger.exception("No fue posible enviar la campaña SMTP")
+            return Response(
+                {"error": "No fue posible enviar el correo. Revisa la configuración SMTP."},
+                status=502,
+            )
+
+        Interaccion.objects.create(
+            cliente=cliente,
+            tipo="email_marketing",
+            descripcion=f"Asunto: {plantilla.asunto or plantilla.nombre}\n\n{body}",
+            created_by=request.user,
+        )
+        return Response({"status": "Email enviado e indexado con éxito."})
+
+    @staticmethod
+    def _create_whatsapp_link(request, cliente, body):
+        if not cliente.telefono:
+            return Response({"error": "El cliente no tiene teléfono registrado."}, status=400)
+        telefono = "".join(filter(str.isdigit, cliente.telefono))
+        if not telefono:
+            return Response({"error": "El teléfono no es válido."}, status=400)
+
+        whatsapp_url = f"https://wa.me/{telefono}?text={urllib.parse.quote(body)}"
+        Interaccion.objects.create(
+            cliente=cliente,
+            tipo="whatsapp_link",
+            descripcion=f"Se generó un enlace de WhatsApp con el mensaje: {body}",
+            created_by=request.user,
+        )
+        return Response({"status": "URL generada", "url": whatsapp_url})
+
 
 class DashboardStatsView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RolePermission]
+    role_permissions = {"GET": {"sales", "production"}}
 
     def get(self, request):
-        #  orígenes de clientes
-        origenes = Cliente.objects.values('origen').annotate(total=Count('id')).order_by('-total')
-
-        # Cotizaciones activas
-        ejecutivos = Cotizacion.objects.filter(estado='enviada').values('projecto__responsable__username').annotate(
-            total_cotizaciones=Count('id'),
-            monto_proyectado=Sum('total')
+        origenes = (
+            Cliente.objects.values("origen")
+            .annotate(total=Count("id"))
+            .order_by("-total")
         )
-
-        # Ventas realizadas
-        ventas_totales = Proyecto.objects.filter(estado='finalizado').aggregate(
-            total_ingresos=Sum('presupuesto_estimado'),
-            cantidad_ventas=Count('id')
+        ejecutivos = (
+            Cotizacion.objects.filter(estado="enviada")
+            .values("projecto__responsable__username")
+            .annotate(total_cotizaciones=Count("id"), monto_proyectado=Sum("total"))
         )
-
-        return Response({
-            "origenes": origenes,
-            "ejecutivos": ejecutivos,
-            "resumen_ventas": {
-                "total_ingresos": ventas_totales['total_ingresos'] or 0,
-                "cantidad_ventas": ventas_totales['cantidad_ventas'] or 0
+        ventas_totales = Proyecto.objects.filter(estado="finalizado").aggregate(
+            total_ingresos=Sum("presupuesto_estimado"), cantidad_ventas=Count("id")
+        )
+        return Response(
+            {
+                "origenes": origenes,
+                "ejecutivos": ejecutivos,
+                "resumen_ventas": {
+                    "total_ingresos": ventas_totales["total_ingresos"] or 0,
+                    "cantidad_ventas": ventas_totales["cantidad_ventas"] or 0,
+                },
             }
-        })
+        )
+
 
 class ExportarExcelView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [RolePermission]
+    role_permissions = {"GET": {"sales"}}
 
     def get(self, request):
-        from .utils import exportar_clientes_excel
-        clientes = Cliente.objects.all()
-        return exportar_clientes_excel(clientes)
-    def get(self, request):
-        origenes = Cliente.objects.values('origen').annotate(total=Count('id')).order_by('-total')
-
-        # cotizaciones activas por ejecutivo
-        ejecutivos = Cotizacion.objects.filter(estado='enviada').values('usuario__username').annotate(
-            total_cotizaciones=Count('id'),
-            monto_proyectado=Sum('total')
-        )
-
-        # ventas realizadas
-        ventas_totales = Proyecto.objects.filter(estado='finalizado').aggregate(
-            total_ingresos=Sum('presupuesto'),
-            cantidad_ventas=Count('id')
-        )
-
-        return Response({
-            "origenes": origenes,
-            "ejecutivos": ejecutivos,
-            "resumen_ventas": ventas_totales
-        })
+        return exportar_clientes_excel(Cliente.objects.all().order_by("nombre"))

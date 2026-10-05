@@ -15,9 +15,9 @@ class Cotizacion(models.Model):
             ('rechazada', 'Rechazada'),
             ('vencida', 'Vencida')],
         default='enviada')
-    fecha_emision = models.DateField(auto_now_add=True) 
-    fecha_vencimiento = models.DateField()  
-    notas = models.TextField(blank=True, null=True) 
+    created_at = models.DateField(auto_now_add=True)
+    fecha_vencimiento = models.DateField()
+    notas = models.TextField(blank=True, null=True)
 
 
 class CotizacionItem(models.Model):

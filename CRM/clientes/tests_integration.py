@@ -1,9 +1,18 @@
-from rest_framework.test import APITestCase
 from django.urls import reverse
+from rest_framework.test import APITestCase
+
 from clientes.models import Cliente
+from users.models import User
 
 
 class ClienteIntegrationTest(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="sales-clientes",
+            password="StrongPass!123",
+            role="sales",
+        )
+        self.client.force_authenticate(self.user)
 
     def test_crear_cliente(self):
         """Prueba que se pueda crear un cliente via API"""

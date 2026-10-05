@@ -12,13 +12,34 @@ class PlantillaMensajeSerializer(serializers.ModelSerializer):
 
 
 class ConfigSMTPSerializer(serializers.ModelSerializer):
+    email_password = serializers.CharField(
+        write_only=True, required=False, allow_blank=True
+    )
+
     class Meta:
         model = ConfigSMTP
-        fields = '__all__'
-        read_only_fields = ['id']
-        
-    
-        # Esto hace que la contraseña se pueda guardar/escribir desde el front
-        extra_kwargs = {
-            'email_password': {'write_only': True}
-        }
+        fields = [
+            "id",
+            "email_usuario",
+            "email_password",
+            "servidor_host",
+            "puerto",
+            "use_tls",
+        ]
+        read_only_fields = ["id"]
+
+    def validate(self, attrs):
+        if self.instance is None and ConfigSMTP.objects.exists():
+            raise serializers.ValidationError(
+                "Solo puede existir una configuración SMTP. Actualiza la existente."
+            )
+        return attrs
+
+    def create(self, validated_data):
+        validated_data.pop("email_password", None)
+        return super().create({**validated_data, "email_password": ""})
+
+    def update(self, instance, validated_data):
+        validated_data.pop("email_password", None)
+        instance.email_password = ""
+        return super().update(instance, validated_data)

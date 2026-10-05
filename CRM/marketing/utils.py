@@ -1,19 +1,36 @@
 import openpyxl
 from django.http import HttpResponse
 
+
+DANGEROUS_FORMULA_PREFIXES = ("=", "+", "-", "@")
+
+
+def safe_excel_value(value):
+    if isinstance(value, str) and value.startswith(DANGEROUS_FORMULA_PREFIXES):
+        return f"'{value}"
+    return value
+
+
 def exportar_clientes_excel(queryset):
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Reporte de Clientes"
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Reporte de Clientes"
+    sheet.append(["Nombre", "Email", "Teléfono", "Origen", "Fecha Registro"])
 
-    # Cabeceras
-    columns = ['Nombre', 'Email', 'Teléfono', 'Origen', 'Fecha Registro']
-    ws.append(columns)
+    for cliente in queryset:
+        sheet.append(
+            [
+                safe_excel_value(cliente.nombre),
+                safe_excel_value(cliente.email),
+                safe_excel_value(cliente.telefono or ""),
+                cliente.origen,
+                cliente.created_at,
+            ]
+        )
 
-    for objeto in queryset:
-        ws.append([objeto.nombre, objeto.email, objeto.telefono, objeto.origen, objeto.fecha_registro.replace(tzinfo=None)])
-
-    response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-    response['Content-Disposition'] = 'attachment; filename=reporte_clientes.xlsx'
-    wb.save(response)
+    response = HttpResponse(
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+    response["Content-Disposition"] = 'attachment; filename="reporte_clientes.xlsx"'
+    workbook.save(response)
     return response
