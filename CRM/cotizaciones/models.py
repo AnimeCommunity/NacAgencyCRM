@@ -3,7 +3,7 @@ from django.db import models
 # Create your models here.
 class Cotizacion(models.Model):
     projecto = models.ForeignKey('proyectos.Proyecto', on_delete=models.CASCADE, related_name='cotizaciones') 
-    numero = models.CharField(max_length=50, unique=True)  
+    numero = models.CharField(max_length=50, unique=True, blank=True, null=True)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)  
     impuestos = models.DecimalField(max_digits=10, decimal_places=2) 
     total = models.DecimalField(max_digits=10, decimal_places=2)  

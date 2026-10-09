@@ -6,7 +6,7 @@ from clientes.views import ClienteViewSet
 from cotizaciones.views import QuotationViewSet
 from interacciones.views import InteractionViewSet
 from marketing.views import ConfigSMTPViewSet, PlantillaMensajeViewSet
-from proyectos.reports_views import InformeGerencialView
+from proyectos.reports_views import InformeGerencialExportView, InformeGerencialView
 from proyectos.views import ProjectViewSet
 from users.views import CRMTokenObtainPairView, LogoutView, RegisterView, UserViewSet
 
@@ -30,5 +30,10 @@ urlpatterns = [
         "api/reports/gerencial/",
         InformeGerencialView.as_view(),
         name="informe-gerencial",
+    ),
+    path(
+        "api/reports/gerencial/export/",
+        InformeGerencialExportView.as_view(),
+        name="informe-gerencial-export",
     ),
 ]

@@ -6,11 +6,13 @@ import {
   Client,
   ClientInput,
   Interaction,
+  InteractionOutcome,
   InteractionType,
   apiService,
   getErrorMessage,
   getSessionClaims,
 } from '@/services/api';
+import { downloadBlob } from '@/services/download';
 
 const emptyClient: ClientInput = {
   nombre: '',
@@ -33,6 +35,16 @@ const interactionLabels: Record<InteractionType, string> = {
   whatsapp_link: 'Enlace de WhatsApp',
 };
 
+const interactionOutcomeLabels: Record<InteractionOutcome, string> = {
+  sin_definir: 'Sin definir',
+  contactado: 'Contactado',
+  sin_respuesta: 'Sin respuesta',
+  interesado: 'Interesado',
+  no_interesado: 'No interesado',
+  reunion_agendada: 'Reunión agendada',
+  cerrado: 'Cierre concretado',
+};
+
 export default function ClientesPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [form, setForm] = useState<ClientInput>(emptyClient);
@@ -40,11 +52,13 @@ export default function ClientesPage() {
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [interactionType, setInteractionType] = useState<InteractionType>('seguimiento');
+  const [interactionOutcome, setInteractionOutcome] = useState<InteractionOutcome>('sin_definir');
   const [interactionDescription, setInteractionDescription] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [exportingHistory, setExportingHistory] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -52,6 +66,8 @@ export default function ClientesPage() {
   const canWriteClients = role === 'admin' || role === 'sales';
   const canDeleteClients = role === 'admin';
   const canExportClients = role === 'admin' || role === 'sales';
+  const canWriteInteractions = role === 'admin' || role === 'sales' || role === 'production';
+  const canExportInteractions = role === 'admin' || role === 'sales';
 
   useEffect(() => {
     let active = true;
@@ -139,9 +155,11 @@ export default function ClientesPage() {
       const created = await apiService.interacciones.create({
         cliente: selectedClient.id,
         tipo: interactionType,
+        resultado: interactionOutcome,
         descripcion: interactionDescription,
       });
       setInteractions((current) => [created, ...current]);
+      setInteractionOutcome('sin_definir');
       setInteractionDescription('');
       setNotice('Interacción registrada.');
     } catch (requestError) {
@@ -175,19 +193,27 @@ export default function ClientesPage() {
     setError('');
     try {
       const blob = await apiService.clientes.exportExcel();
-      const url = window.URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = 'reporte_clientes.xlsx';
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.URL.revokeObjectURL(url);
+      downloadBlob(blob, 'reporte_clientes.xlsx');
       setNotice('Reporte XLSX descargado.');
     } catch (requestError) {
       setError(getErrorMessage(requestError, 'No fue posible exportar el reporte.'));
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleExportHistory = async () => {
+    if (!selectedClient) return;
+    setExportingHistory(true);
+    setError('');
+    try {
+      const blob = await apiService.interacciones.exportExcel(selectedClient.id);
+      downloadBlob(blob, `interacciones_${selectedClient.nombre.replaceAll(' ', '_')}.xlsx`);
+      setNotice('Historial de interacciones descargado.');
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, 'No fue posible exportar el historial.'));
+    } finally {
+      setExportingHistory(false);
     }
   };
 
@@ -214,7 +240,7 @@ export default function ClientesPage() {
             <h2 id="client-form-title" className="text-lg font-semibold text-slate-800">{editingId ? 'Editar cliente' : 'Nuevo cliente'}</h2>
             {editingId && <button type="button" onClick={resetForm} className="text-sm font-medium text-slate-500 hover:text-slate-800">Cancelar</button>}
           </div>
-          {!canWriteClients && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">El rol de producción tiene acceso de solo lectura a clientes.</p>}
+          {!canWriteClients && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">El rol de producción puede consultar clientes y registrar interacciones, pero no modificar sus datos.</p>}
           <div>
             <label htmlFor="client-name" className="block text-sm font-medium text-slate-700">Nombre</label>
             <input id="client-name" required disabled={!canWriteClients} value={form.nombre} onChange={(event) => setForm({ ...form, nombre: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
@@ -312,35 +338,53 @@ export default function ClientesPage() {
       </div>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="history-title">
-        <div className="flex flex-col gap-2 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 id="history-title" className="text-lg font-semibold text-slate-800">Historial de interacciones</h2>
             <p className="text-sm text-slate-500">{selectedClient ? `Filtrado por ${selectedClient.nombre}` : 'Selecciona “Historial” en un cliente.'}</p>
           </div>
+          {selectedClient && canExportInteractions && (
+            <button type="button" onClick={handleExportHistory} disabled={exportingHistory} className="rounded-lg border border-emerald-300 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+              {exportingHistory ? 'Descargando…' : 'Descargar historial XLSX'}
+            </button>
+          )}
         </div>
 
         {selectedClient && (
           <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(17rem,0.8fr)_minmax(0,2fr)]">
             <form onSubmit={handleCreateInteraction} className="space-y-4 rounded-lg bg-slate-50 p-4">
               <h3 className="font-semibold text-slate-800">Registrar interacción</h3>
+              {!canWriteInteractions && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Tu rol puede consultar el historial, pero no registrar interacciones.</p>}
               <div>
                 <label htmlFor="interaction-type" className="block text-sm font-medium text-slate-700">Tipo</label>
-                <select id="interaction-type" value={interactionType} onChange={(event) => setInteractionType(event.target.value as InteractionType)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                <select id="interaction-type" disabled={!canWriteInteractions} value={interactionType} onChange={(event) => setInteractionType(event.target.value as InteractionType)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
                   <option value="llamada">Llamada</option><option value="correo_manual">Correo manual</option><option value="reunión">Reunión</option><option value="seguimiento">Seguimiento</option>
                 </select>
               </div>
               <div>
-                <label htmlFor="interaction-description" className="block text-sm font-medium text-slate-700">Descripción</label>
-                <textarea id="interaction-description" rows={4} required value={interactionDescription} onChange={(event) => setInteractionDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+                <label htmlFor="interaction-outcome" className="block text-sm font-medium text-slate-700">Resultado</label>
+                <select id="interaction-outcome" disabled={!canWriteInteractions} value={interactionOutcome} onChange={(event) => setInteractionOutcome(event.target.value as InteractionOutcome)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                  {Object.entries(interactionOutcomeLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
               </div>
-              <button type="submit" disabled={saving} className="w-full rounded-lg bg-slate-800 px-4 py-2.5 font-semibold text-white hover:bg-slate-900 disabled:bg-slate-400">Agregar al historial</button>
+              <div>
+                <label htmlFor="interaction-description" className="block text-sm font-medium text-slate-700">Descripción</label>
+                <textarea id="interaction-description" rows={4} required disabled={!canWriteInteractions} value={interactionDescription} onChange={(event) => setInteractionDescription(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2" />
+              </div>
+              <button type="submit" disabled={saving || !canWriteInteractions} className="w-full rounded-lg bg-slate-800 px-4 py-2.5 font-semibold text-white hover:bg-slate-900 disabled:bg-slate-400">Agregar al historial</button>
             </form>
             <div>
               {historyLoading ? <p className="py-6 text-center text-sm text-slate-500">Cargando historial…</p> : interactions.length === 0 ? <p className="py-6 text-center text-sm text-slate-500">No hay interacciones para este cliente.</p> : (
                 <ol className="space-y-3">
                   {interactions.map((interaction) => (
                     <li key={interaction.id} className="rounded-lg border border-slate-200 p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2"><span className="rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">{interactionLabels[interaction.tipo]}</span><time className="text-xs text-slate-500">{new Date(interaction.created_at).toLocaleString('es')}</time></div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-indigo-50 px-2 py-1 text-xs font-semibold text-indigo-700">{interactionLabels[interaction.tipo]}</span>
+                          <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">{interactionOutcomeLabels[interaction.resultado]}</span>
+                        </div>
+                        <time className="text-xs text-slate-500">{new Date(interaction.created_at).toLocaleString('es')}</time>
+                      </div>
                       <p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{interaction.descripcion}</p>
                     </li>
                   ))}

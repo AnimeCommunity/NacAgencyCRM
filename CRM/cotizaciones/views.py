@@ -1,8 +1,10 @@
+from rest_framework.decorators import action
 from rest_framework.viewsets import ModelViewSet
 
 from CRM.permissions import RolePermission
 from .models import Cotizacion
 from .serializers import QuotationSerializer
+from .utils import export_quotations_xlsx
 
 
 class QuotationViewSet(ModelViewSet):
@@ -18,4 +20,9 @@ class QuotationViewSet(ModelViewSet):
         "update": {"sales"},
         "partial_update": {"sales"},
         "destroy": set(),
+        "export": {"sales"},
     }
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        return export_quotations_xlsx(self.get_queryset().order_by("-created_at", "-id"))

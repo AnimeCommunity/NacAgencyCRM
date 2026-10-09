@@ -9,6 +9,7 @@ import {
   getErrorMessage,
   getSessionClaims,
 } from '@/services/api';
+import { downloadBlob } from '@/services/download';
 
 interface DraftItem extends QuotationItemInput {
   key: number;
@@ -18,7 +19,6 @@ export default function CotizacionesPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [projectId, setProjectId] = useState('');
-  const [number, setNumber] = useState('');
   const [expirationDate, setExpirationDate] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<DraftItem[]>([]);
@@ -27,6 +27,7 @@ export default function CotizacionesPage() {
   const [itemPrice, setItemPrice] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -101,7 +102,6 @@ export default function CotizacionesPage() {
     try {
       const created = await apiService.cotizaciones.create({
         projecto: Number(projectId),
-        numero: number.trim(),
         estado: 'enviada',
         fecha_vencimiento: expirationDate,
         notas: notes,
@@ -113,7 +113,6 @@ export default function CotizacionesPage() {
       });
       setQuotations((current) => [created, ...current]);
       setProjectId('');
-      setNumber('');
       setExpirationDate('');
       setNotes('');
       setItems([]);
@@ -142,11 +141,30 @@ export default function CotizacionesPage() {
     }
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      const blob = await apiService.cotizaciones.exportExcel();
+      downloadBlob(blob, 'historial_cotizaciones.xlsx');
+      setNotice('Historial de cotizaciones descargado.');
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, 'No fue posible descargar las cotizaciones.'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Cotizaciones</h1>
-        <p className="mt-1 text-sm text-slate-500">Los importes definitivos se calculan y validan en el servidor.</p>
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">Cotizaciones</h1>
+          <p className="mt-1 text-sm text-slate-500">Los importes definitivos se calculan y validan en el servidor.</p>
+        </div>
+        {canCreate && <button type="button" onClick={handleExport} disabled={exporting} className="rounded-lg border border-emerald-300 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50">
+          {exporting ? 'Descargando…' : 'Descargar historial XLSX'}
+        </button>}
       </header>
 
       <div aria-live="polite" className="space-y-2">
@@ -165,15 +183,12 @@ export default function CotizacionesPage() {
               {projects.map((project) => <option key={project.id} value={project.id}>{project.nombre}</option>)}
             </select>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
-            <div>
-              <label htmlFor="quotation-number" className="block text-sm font-medium text-slate-700">Número</label>
-              <input id="quotation-number" placeholder="COT-001" required disabled={!canCreate} value={number} onChange={(event) => setNumber(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
-            </div>
-            <div>
-              <label htmlFor="quotation-expiration" className="block text-sm font-medium text-slate-700">Vencimiento</label>
-              <input id="quotation-expiration" type="date" min={today} required disabled={!canCreate} value={expirationDate} onChange={(event) => setExpirationDate(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
-            </div>
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-800">
+            El consecutivo se asignará automáticamente al guardar la cotización.
+          </div>
+          <div>
+            <label htmlFor="quotation-expiration" className="block text-sm font-medium text-slate-700">Vencimiento</label>
+            <input id="quotation-expiration" type="date" min={today} required disabled={!canCreate} value={expirationDate} onChange={(event) => setExpirationDate(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
           </div>
           <div>
             <label htmlFor="quotation-notes" className="block text-sm font-medium text-slate-700">Notas</label>

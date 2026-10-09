@@ -21,6 +21,8 @@ class Proyecto(models.Model):
     fecha_inicio = models.DateField()
     fecha_fin = models.DateField()
     presupuesto_estimado = models.DecimalField(max_digits=10, decimal_places=2)
+    pagado = models.BooleanField(default=False)
+    fecha_pago = models.DateField(blank=True, null=True)
     estado = models.CharField(
         max_length=50,
         choices=[
@@ -33,3 +35,14 @@ class Proyecto(models.Model):
         default='propuesta')  
     responsable = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='proyectos_asignados')
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(pagado=True, fecha_pago__isnull=False)
+                    | models.Q(pagado=False, fecha_pago__isnull=True)
+                ),
+                name="proyecto_pago_fecha_consistente",
+            )
+        ]

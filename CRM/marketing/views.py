@@ -3,7 +3,10 @@ import urllib.parse
 
 from django.conf import settings
 from django.core.mail import EmailMessage, get_connection
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, Sum
+from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
@@ -15,10 +18,35 @@ from interacciones.models import Interaccion
 from proyectos.models import Proyecto
 from .models import ConfigSMTP, PlantillaMensaje
 from .serializers import ConfigSMTPSerializer, PlantillaMensajeSerializer
+from .smtp_secrets import SMTPSecretError, decrypt_smtp_password
 from .utils import exportar_clientes_excel
 
 
 logger = logging.getLogger(__name__)
+
+
+def _smtp_password(config):
+    if config.email_password:
+        return decrypt_smtp_password(config.email_password)
+    return getattr(settings, "CRM_SMTP_PASSWORD", "")
+
+
+def _smtp_connection(config):
+    allowed_hosts = set(getattr(settings, "CRM_SMTP_ALLOWED_HOSTS", []))
+    if config.servidor_host not in allowed_hosts:
+        raise ValueError("El servidor SMTP no está permitido por la configuración.")
+    password = _smtp_password(config)
+    if not password:
+        raise ValueError("La contraseña SMTP no está configurada.")
+    return get_connection(
+        backend="django.core.mail.backends.smtp.EmailBackend",
+        host=config.servidor_host,
+        port=config.puerto,
+        username=config.email_usuario,
+        password=password,
+        use_tls=config.use_tls,
+        timeout=10,
+    )
 
 
 class PlantillaMensajeViewSet(ModelViewSet):
@@ -40,6 +68,23 @@ class ConfigSMTPViewSet(ModelViewSet):
     serializer_class = ConfigSMTPSerializer
     permission_classes = [RolePermission]
     role_permissions = {"*": {"admin"}}
+
+    @action(detail=True, methods=["post"], url_path="test-connection")
+    def test_connection(self, request, pk=None):
+        config = self.get_object()
+        try:
+            connection = _smtp_connection(config)
+            connection.open()
+            connection.close()
+        except (ValueError, SMTPSecretError, ImproperlyConfigured) as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logger.exception("No fue posible verificar la conexión SMTP")
+            return Response(
+                {"error": "No fue posible conectar con el servidor SMTP."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response({"status": "Conexión SMTP verificada."})
 
 
 class EnviarCampanaView(APIView):
@@ -71,27 +116,8 @@ class EnviarCampanaView(APIView):
         if not config:
             return Response({"error": "No existe configuración SMTP."}, status=400)
 
-        allowed_hosts = set(getattr(settings, "CRM_SMTP_ALLOWED_HOSTS", []))
-        if config.servidor_host not in allowed_hosts:
-            return Response(
-                {"error": "El servidor SMTP no está permitido por la configuración."},
-                status=400,
-            )
-
-        password = getattr(settings, "CRM_SMTP_PASSWORD", "")
-        if not password:
-            return Response({"error": "La contraseña SMTP no está configurada."}, status=400)
-
         try:
-            connection = get_connection(
-                backend="django.core.mail.backends.smtp.EmailBackend",
-                host=config.servidor_host,
-                port=config.puerto,
-                username=config.email_usuario,
-                password=password,
-                use_tls=config.use_tls,
-                timeout=10,
-            )
+            connection = _smtp_connection(config)
             email = EmailMessage(
                 subject=plantilla.asunto or plantilla.nombre,
                 body=body,
@@ -100,6 +126,8 @@ class EnviarCampanaView(APIView):
                 connection=connection,
             )
             email.send(fail_silently=False)
+        except (ValueError, SMTPSecretError, ImproperlyConfigured) as exc:
+            return Response({"error": str(exc)}, status=400)
         except Exception:
             logger.exception("No fue posible enviar la campaña SMTP")
             return Response(

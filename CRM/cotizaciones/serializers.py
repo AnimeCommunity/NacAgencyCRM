@@ -48,7 +48,14 @@ class QuotationSerializer(serializers.ModelSerializer):
             "notas",
             "items",
         ]
-        read_only_fields = ["id", "subtotal", "impuestos", "total", "created_at"]
+        read_only_fields = [
+            "id",
+            "numero",
+            "subtotal",
+            "impuestos",
+            "total",
+            "created_at",
+        ]
 
     def validate(self, attrs):
         items = attrs.get("items")
@@ -73,11 +80,14 @@ class QuotationSerializer(serializers.ModelSerializer):
         items_data = validated_data.pop("items")
         subtotal, impuestos, total = self._totals(items_data)
         quotation = Cotizacion.objects.create(
+            numero=None,
             subtotal=subtotal,
             impuestos=impuestos,
             total=total,
             **validated_data,
         )
+        quotation.numero = f"COT-{timezone.localdate().year}-{quotation.id:06d}"
+        quotation.save(update_fields=["numero"])
         CotizacionItem.objects.bulk_create(
             [
                 CotizacionItem(

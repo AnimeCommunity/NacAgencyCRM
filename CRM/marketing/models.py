@@ -41,10 +41,10 @@ class ConfigSMTP(models.Model):
     singleton_key = models.PositiveSmallIntegerField(default=1, unique=True, editable=False)
     email_usuario = models.EmailField(max_length=150, help_text="Correo desde el que se enviarán los mensajes")
     email_password = models.CharField(
-        max_length=255,
+        max_length=512,
         blank=True,
         default="",
-        help_text="Se conserva vacío; el secreto se carga desde CRM_SMTP_PASSWORD.",
+        help_text="Credencial SMTP cifrada; nunca se devuelve mediante la API.",
     )
     servidor_host = models.CharField(max_length=100, default="smtp.gmail.com")
     puerto = models.IntegerField(default=587)

@@ -13,9 +13,24 @@ class Interaccion(models.Model):
         ('whatsapp_link', 'Enlace de WhatsApp Generado'),        
     ]
     
+    RESULTADO_CHOICES = [
+        ('sin_definir', 'Sin definir'),
+        ('contactado', 'Contactado'),
+        ('sin_respuesta', 'Sin respuesta'),
+        ('interesado', 'Interesado'),
+        ('no_interesado', 'No interesado'),
+        ('reunion_agendada', 'Reunión agendada'),
+        ('cerrado', 'Cierre concretado'),
+    ]
+
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='interacciones')
     tipo = models.CharField(max_length=50, choices=TIPO_CHOICES)
-    descripcion = models.TextField() 
+    resultado = models.CharField(
+        max_length=30,
+        choices=RESULTADO_CHOICES,
+        default='sin_definir',
+    )
+    descripcion = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     
     

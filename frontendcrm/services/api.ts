@@ -61,10 +61,20 @@ export type InteractionType =
   | 'email_marketing'
   | 'whatsapp_link';
 
+export type InteractionOutcome =
+  | 'sin_definir'
+  | 'contactado'
+  | 'sin_respuesta'
+  | 'interesado'
+  | 'no_interesado'
+  | 'reunion_agendada'
+  | 'cerrado';
+
 export interface Interaction {
   id: number;
   cliente: number;
   tipo: InteractionType;
+  resultado: InteractionOutcome;
   descripcion: string;
   created_at: string;
   created_by: number | null;
@@ -73,6 +83,7 @@ export interface Interaction {
 export interface InteractionInput {
   cliente: number;
   tipo: InteractionType;
+  resultado: InteractionOutcome;
   descripcion: string;
 }
 
@@ -89,6 +100,8 @@ export interface Project {
   fecha_inicio: string;
   fecha_fin: string;
   presupuesto_estimado: string;
+  pagado: boolean;
+  fecha_pago: string | null;
   estado: ProjectStatus;
   created_at: string;
 }
@@ -102,6 +115,8 @@ export interface ProjectInput {
   fecha_inicio: string;
   fecha_fin: string;
   presupuesto_estimado: number;
+  pagado: boolean;
+  fecha_pago: string | null;
   estado: ProjectStatus;
 }
 
@@ -140,14 +155,17 @@ export interface Quotation {
   items: QuotationItem[];
 }
 
-export interface QuotationInput {
+export interface QuotationCreateInput {
   projecto: number;
-  numero: string;
   estado: QuotationStatus;
   fecha_vencimiento: string;
   notas: string;
   items: QuotationItemInput[];
 }
+
+export type QuotationUpdateInput = Partial<
+  Pick<Quotation, 'estado' | 'fecha_vencimiento' | 'notas'>
+> & { items?: QuotationItemInput[] };
 
 export type MarketingTemplateType = 'email' | 'whatsapp';
 
@@ -174,9 +192,16 @@ export interface SMTPConfig {
   servidor_host: string;
   puerto: number;
   use_tls: boolean;
+  password_configurada: boolean;
 }
 
-export type SMTPConfigInput = Omit<SMTPConfig, 'id'>;
+export interface SMTPConfigInput {
+  email_usuario: string;
+  email_password?: string;
+  servidor_host: string;
+  puerto: number;
+  use_tls: boolean;
+}
 
 export interface CampaignResponse {
   status: string;
@@ -196,13 +221,43 @@ export interface MarketingStats {
   };
 }
 
+export interface ReportFilters {
+  desde?: string;
+  hasta?: string;
+  cliente?: number;
+  responsable?: number;
+  estado_proyecto?: ProjectStatus;
+  tipo_evento?: EventType;
+}
+
 export interface ManagementReport {
+  filtros: ReportFilters;
   resumen_conversion: {
     total: number;
     aceptadas: number;
     pendientes: number;
+    rechazadas: number;
+    vencidas: number;
     tasa_exito_porcentaje: number;
   };
+  clientes_conversion: {
+    total_clientes: number;
+    clientes_que_cotizaron: number;
+    clientes_que_concretaron: number;
+    clientes_que_pagaron: number;
+    tasa_cliente_a_cotizacion: number;
+    tasa_cotizacion_a_cierre: number;
+    tasa_cierre_a_pago: number;
+  };
+  resumen_financiero: {
+    ingresos_aceptados: string | number;
+    ingresos_pagados: string | number;
+    saldo_por_cobrar: string | number;
+  };
+  clientes_por_estado: Array<{ estado: ClientStatus; total: number }>;
+  proyectos_por_estado: Array<{ estado: ProjectStatus; total: number }>;
+  cotizaciones_por_estado: Array<{ estado: QuotationStatus; total: number }>;
+  interacciones_por_resultado: Array<{ resultado: InteractionOutcome; total: number }>;
   ingresos_por_tipo_evento: Array<{
     tipo_evento: EventType;
     cantidad_proyectos: number;
@@ -211,6 +266,30 @@ export interface ManagementReport {
   top_5_clientes: Array<{
     nombre: string;
     total_invertido: string;
+  }>;
+  clientes_por_proyecto: Array<{
+    proyecto_id: number;
+    proyecto_nombre: string;
+    estado: ProjectStatus;
+    pagado: boolean;
+    cliente_id: number;
+    cliente_nombre: string;
+    cotizaciones: number;
+    cotizaciones_aceptadas: number;
+  }>;
+  actividad_mensual: Array<{
+    periodo: string;
+    proyectos: number;
+    cotizaciones: number;
+    interacciones: number;
+    ingresos_aceptados: string | number;
+  }>;
+  actividad_semanal: Array<{
+    periodo: string;
+    proyectos: number;
+    cotizaciones: number;
+    interacciones: number;
+    ingresos_aceptados: string | number;
   }>;
 }
 
@@ -400,6 +479,15 @@ async function requestBlob(endpoint: string): Promise<Blob> {
   return response.blob();
 }
 
+function withQuery(endpoint: string, params: object): string {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== '') query.set(key, String(value));
+  });
+  const serialized = query.toString();
+  return serialized ? `${endpoint}?${serialized}` : endpoint;
+}
+
 export const apiService = {
   auth: {
     login: async (data: LoginInput) => {
@@ -456,6 +544,8 @@ export const apiService = {
     update: (id: number, data: Partial<InteractionInput>) =>
       request<Interaction>(`/interactions/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
     remove: (id: number) => request<void>(`/interactions/${id}/`, { method: 'DELETE' }),
+    exportExcel: (clientId?: number) =>
+      requestBlob(`/interactions/export/${clientId ? `?cliente=${clientId}` : ''}`),
   },
   proyectos: {
     getAll: () => request<Project[]>('/projects/'),
@@ -463,13 +553,16 @@ export const apiService = {
       request<ProjectMutationResponse>('/projects/', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: number, data: Partial<ProjectInput>) =>
       request<ProjectMutationResponse>(`/projects/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+    cancel: (id: number) =>
+      request<Project>(`/projects/${id}/cancel/`, { method: 'POST' }),
   },
   cotizaciones: {
     getAll: () => request<Quotation[]>('/quotations/'),
-    create: (data: QuotationInput) =>
+    create: (data: QuotationCreateInput) =>
       request<Quotation>('/quotations/', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: number, data: Partial<QuotationInput>) =>
+    update: (id: number, data: QuotationUpdateInput) =>
       request<Quotation>(`/quotations/${id}/`, { method: 'PATCH', body: JSON.stringify(data) }),
+    exportExcel: () => requestBlob('/quotations/export/'),
   },
   marketing: {
     getTemplates: () => request<MarketingTemplate[]>('/marketing/templates/'),
@@ -489,6 +582,10 @@ export const apiService = {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
+    testConfig: (id: number) =>
+      request<{ status: string }>(`/marketing/config-smtp/${id}/test-connection/`, {
+        method: 'POST',
+      }),
     enviarCampana: (clienteId: number, plantillaId: number) =>
       request<CampaignResponse>('/marketing/enviar-campana/', {
         method: 'POST',
@@ -497,6 +594,9 @@ export const apiService = {
     getStats: () => request<MarketingStats>('/marketing/stats/'),
   },
   reportes: {
-    getInformeGerencial: () => request<ManagementReport>('/reports/gerencial/'),
+    getInformeGerencial: (filters: ReportFilters = {}) =>
+      request<ManagementReport>(withQuery('/reports/gerencial/', filters)),
+    exportInformeGerencial: (filters: ReportFilters = {}) =>
+      requestBlob(withQuery('/reports/gerencial/export/', filters)),
   },
 };
