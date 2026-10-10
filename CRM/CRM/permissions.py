@@ -1,37 +1,29 @@
-from rest_framework.permissions import BasePermission, SAFE_METHODS
+from rest_framework.permissions import BasePermission
+
 
 class RolePermission(BasePermission):
+    """Aplica una matriz de roles definida por cada vista o ViewSet.
+
+    Los administradores siempre tienen acceso. Para los demás roles, la vista
+    debe declarar ``role_permissions`` usando acciones de ViewSet (``list``,
+    ``create``...) o métodos HTTP como claves.
     """
-    Permisos simples basados en rol
-    """
+
+    message = "No tienes permisos para realizar esta acción."
 
     def has_permission(self, request, view):
         user = request.user
-
-        if not user.is_authenticated:
+        if not user or not user.is_authenticated:
             return False
-
-        # Admin puede todo
-        if user.role == 'admin':
+        if getattr(user, "role", None) == "admin":
             return True
 
-        # Métodos de solo lectura
-        if request.method in SAFE_METHODS:
-            return True
+        permissions = getattr(view, "role_permissions", {})
+        action = getattr(view, "action", None)
+        allowed_roles = permissions.get(action)
+        if allowed_roles is None:
+            allowed_roles = permissions.get(request.method)
+        if allowed_roles is None:
+            allowed_roles = permissions.get("*")
 
-        # Reglas por rol
-        if user.role == 'ventas':
-            return self.allow_sales(view)
-
-        if user.role == 'produccion':
-            return self.allow_production(view)
-
-        return False
-
-    def allow_sales(self, view):
-        # Ventas no puede tocar usuarios
-        return view.basename not in ['users']
-
-    def allow_production(self, view):
-        # Producción solo lectura excepto interacciones
-        return view.basename in ['interactions']
+        return allowed_roles is not None and user.role in allowed_roles

@@ -1,145 +1,177 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { apiService } from '@/services/api';
+
+import { FormEvent, useEffect, useState } from 'react';
+import {
+  Client,
+  MarketingTemplate,
+  MarketingTemplateInput,
+  apiService,
+  getErrorMessage,
+  getSessionClaims,
+} from '@/services/api';
+
+const emptyTemplate: MarketingTemplateInput = {
+  nombre: '',
+  tipo: 'email',
+  asunto: '',
+  contenido: '',
+};
 
 export default function MarketingPage() {
-  const [clientes, setClientes] = useState([]);
-  const [plantillas, setPlantillas] = useState([]);
-  
-  // Estado para crear nueva plantilla
-  const [nuevaPlantilla, setNuevaPlantilla] = useState({ nombre: '', tipo: 'email', asunto: '', contenido: '' });
-  
-  // Estado para la acción de enviar
-  const [seleccion, setSeleccion] = useState({ clienteId: '', plantillaId: '' });
-  const [loading, setLoading] = useState(false);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [templates, setTemplates] = useState<MarketingTemplate[]>([]);
+  const [templateForm, setTemplateForm] = useState(emptyTemplate);
+  const [selection, setSelection] = useState({ clientId: '', templateId: '' });
+  const [loading, setLoading] = useState(true);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [whatsappUrl, setWhatsappUrl] = useState('');
+  const role = getSessionClaims()?.role;
+  const canManage = role === 'admin' || role === 'sales';
 
-  const cargarDatos = async () => {
-    try {
-      const cls = await apiService.clientes.getAll();
-      const tpls = await apiService.marketing.getTemplates();
-      setClientes(cls);
-      setPlantillas(tpls);
-    } catch (err) {
-      console.error("Error cargando datos de marketing", err);
-    }
-  };
-
-  useEffect(() => { cargarDatos(); }, []);
-
-  const handleCrearPlantilla = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      await apiService.marketing.createTemplate(nuevaPlantilla);
-      alert("¡Plantilla guardada con éxito!");
-      setNuevaPlantilla({ nombre: '', tipo: 'email', asunto: '', contenido: '' });
-      cargarDatos();
-    } catch (err: any) {
-      alert(err.message);
-    }
-  };
-
-  const handleEnviarCampana = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!seleccion.clienteId || !seleccion.plantillaId) return;
-    
-    setLoading(true);
-    try {
-      const res = await apiService.marketing.enviarCampana(
-        parseInt(seleccion.clienteId),
-        parseInt(seleccion.plantillaId)
-      );
-
-      
-      if (res.url) {
-        window.open(res.url, '_blank');
-        alert("¡Enlace de WhatsApp generado e historial guardado!");
-      } else {
-        alert(res.status || "¡Correo enviado con éxito!");
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const [clientData, templateData] = await Promise.all([
+          apiService.clientes.getAll(),
+          apiService.marketing.getTemplates(),
+        ]);
+        if (active) {
+          setClients(clientData);
+          setTemplates(templateData);
+        }
+      } catch (requestError) {
+        if (active) setError(getErrorMessage(requestError, 'No fue posible cargar marketing.'));
+      } finally {
+        if (active) setLoading(false);
       }
-    } catch (err: any) {
-      alert(`Error al procesar el envío: ${err.message}`);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleCreateTemplate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSavingTemplate(true);
+    setError('');
+    setNotice('');
+    try {
+      const created = await apiService.marketing.createTemplate({
+        ...templateForm,
+        asunto: templateForm.tipo === 'email' ? templateForm.asunto : '',
+      });
+      setTemplates((current) => [created, ...current]);
+      setTemplateForm(emptyTemplate);
+      setNotice('Plantilla creada correctamente.');
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, 'No fue posible crear la plantilla.'));
     } finally {
-      setLoading(false);
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleSend = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSending(true);
+    setError('');
+    setNotice('');
+    setWhatsappUrl('');
+    try {
+      const response = await apiService.marketing.enviarCampana(
+        Number(selection.clientId),
+        Number(selection.templateId),
+      );
+      if (response.url) setWhatsappUrl(response.url);
+      setNotice(response.status || 'Acción de marketing completada.');
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, 'No fue posible ejecutar la acción de marketing.'));
+    } finally {
+      setSending(false);
     }
   };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h2 className="text-3xl font-bold">Módulo de Automatización & Marketing</h2>
-        <p className="text-gray-500">Diseña mensajes predeterminados y dispara campañas masivas o individuales.</p>
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Marketing y comunicaciones</h1>
+        <p className="mt-1 text-sm text-slate-500">Crea plantillas y registra cada envío en el historial del cliente.</p>
+      </header>
+
+      <div aria-live="polite" className="space-y-2">
+        {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</p>}
+        {notice && <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{notice}</p>}
+        {whatsappUrl && <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-800">Abrir conversación en WhatsApp</a>}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* crear plantilla */}
-        <form onSubmit={handleCrearPlantilla} className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
-          <h3 className="text-lg font-semibold border-b pb-2">Nueva Plantilla (Newsletter o Chat)</h3>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Nombre de la Plantilla</label>
-            <input type="text" required placeholder="Ej: Recordatorio de Pago, Promo Mes" value={nuevaPlantilla.nombre} onChange={e => setNuevaPlantilla({...nuevaPlantilla, nombre: e.target.value})} className="mt-1 block w-full p-2 border rounded-md" />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Canal de Envío</label>
-            <select value={nuevaPlantilla.tipo} onChange={e => setNuevaPlantilla({...nuevaPlantilla, tipo: e.target.value})} className="mt-1 block w-full p-2 border rounded-md bg-white">
-              <option value="email">Correo Electrónico (SMTP)</option>
-              <option value="whatsapp">Mensaje Directo de WhatsApp</option>
-            </select>
-          </div>
-          {nuevaPlantilla.tipo === 'email' && (
+      {loading ? <p className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Cargando clientes y plantillas…</p> : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <form onSubmit={handleCreateTemplate} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="template-form-title">
+            <h2 id="template-form-title" className="text-lg font-semibold text-slate-800">Nueva plantilla</h2>
+            {!canManage && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">El rol de producción puede consultar plantillas, pero no crearlas ni enviar campañas.</p>}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Asunto del Correo</label>
-              <input type="text" required value={nuevaPlantilla.asunto} onChange={e => setNuevaPlantilla({...nuevaPlantilla, asunto: e.target.value})} className="mt-1 block w-full p-2 border rounded-md" />
+              <label htmlFor="template-name" className="block text-sm font-medium text-slate-700">Nombre</label>
+              <input id="template-name" required disabled={!canManage} value={templateForm.nombre} onChange={(event) => setTemplateForm({ ...templateForm, nombre: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
             </div>
-          )}
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Cuerpo del Mensaje</label>
-            <p className="text-xs text-gray-400 mb-1">Usa {"{nombre}"} para personalizar dinámicamente.</p>
-            <textarea required rows={4} value={nuevaPlantilla.contenido} onChange={e => setNuevaPlantilla({...nuevaPlantilla, contenido: e.target.value})} placeholder="Hola {nombre}, te escribimos de EventCRM..." className="block w-full p-2 border rounded-md" />
-          </div>
-          <button type="submit" className="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 transition">
-            Guardar Plantilla
-          </button>
-        </form>
-
-        {/* envios*/}
-        <div className="space-y-6">
-          <form onSubmit={handleEnviarCampana} className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
-            <h3 className="text-lg font-semibold border-b pb-2 text-green-600">Lanzador de Comunicaciones</h3>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Seleccionar Cliente Destinatario</label>
-              <select required value={seleccion.clienteId} onChange={e => setSeleccion({...seleccion, clienteId: e.target.value})} className="mt-1 block w-full p-2 border rounded-md bg-white">
-                <option value="">-- Selecciona un Cliente --</option>
-                {clientes.map((c: any) => <option key={c.id} value={c.id}>{c.nombre} ({c.email})</option>)}
+              <label htmlFor="template-type" className="block text-sm font-medium text-slate-700">Canal</label>
+              <select id="template-type" disabled={!canManage} value={templateForm.tipo} onChange={(event) => setTemplateForm({ ...templateForm, tipo: event.target.value as MarketingTemplateInput['tipo'] })} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                <option value="email">Correo electrónico</option><option value="whatsapp">WhatsApp</option>
               </select>
             </div>
+            {templateForm.tipo === 'email' && (
+              <div>
+                <label htmlFor="template-subject" className="block text-sm font-medium text-slate-700">Asunto</label>
+                <input id="template-subject" required disabled={!canManage} value={templateForm.asunto} onChange={(event) => setTemplateForm({ ...templateForm, asunto: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+              </div>
+            )}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Seleccionar Mensaje/Plantilla</label>
-              <select required value={seleccion.plantillaId} onChange={e => setSeleccion({...seleccion, plantillaId: e.target.value})} className="mt-1 block w-full p-2 border rounded-md bg-white">
-                <option value="">-- Selecciona una Plantilla --</option>
-                {plantillas.map((t: any) => <option key={t.id} value={t.id}>{t.nombre} [{t.tipo_display}]</option>)}
-              </select>
+              <label htmlFor="template-content" className="block text-sm font-medium text-slate-700">Mensaje</label>
+              <p className="mb-1 text-xs text-slate-500">Usa {'{nombre}'} para personalizar el destinatario.</p>
+              <textarea id="template-content" required rows={6} disabled={!canManage} value={templateForm.contenido} onChange={(event) => setTemplateForm({ ...templateForm, contenido: event.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2" />
             </div>
-            <button type="submit" disabled={loading} className="w-full bg-green-600 text-white p-3 rounded-md font-medium hover:bg-green-700 transition disabled:bg-gray-400">
-              {loading ? 'Procesando Envío...' : 'Ejecutar Acción de Marketing'}
-            </button>
+            <button type="submit" disabled={savingTemplate || !canManage} className="w-full rounded-lg bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:bg-slate-400">{savingTemplate ? 'Guardando…' : 'Guardar plantilla'}</button>
           </form>
 
-          {/* plantillas activas */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border">
-            <h4 className="font-semibold text-gray-700 mb-2">Plantillas Activas</h4>
-            <ul className="divide-y text-sm max-h-40 overflow-y-auto">
-              {plantillas.map((t: any) => (
-                <li key={t.id} className="py-2 flex justify-between items-center">
-                  <span className="font-medium">{t.nombre}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${t.tipo === 'email' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>{t.tipo_display}</span>
-                </li>
-              ))}
-            </ul>
+          <div className="space-y-6">
+            <form onSubmit={handleSend} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="campaign-form-title">
+              <h2 id="campaign-form-title" className="text-lg font-semibold text-slate-800">Enviar comunicación</h2>
+              <div>
+                <label htmlFor="campaign-client" className="block text-sm font-medium text-slate-700">Cliente</label>
+                <select id="campaign-client" required disabled={!canManage} value={selection.clientId} onChange={(event) => setSelection({ ...selection, clientId: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                  <option value="">Selecciona un cliente</option>
+                  {clients.map((client) => <option key={client.id} value={client.id}>{client.nombre} · {client.email}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="campaign-template" className="block text-sm font-medium text-slate-700">Plantilla</label>
+                <select id="campaign-template" required disabled={!canManage} value={selection.templateId} onChange={(event) => setSelection({ ...selection, templateId: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2">
+                  <option value="">Selecciona una plantilla</option>
+                  {templates.map((template) => <option key={template.id} value={template.id}>{template.nombre} · {template.tipo_display}</option>)}
+                </select>
+              </div>
+              <button type="submit" disabled={sending || !canManage} className="w-full rounded-lg bg-emerald-700 px-4 py-3 font-semibold text-white hover:bg-emerald-800 disabled:bg-slate-400">{sending ? 'Procesando…' : 'Ejecutar acción'}</button>
+            </form>
+
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm" aria-labelledby="templates-title">
+              <h2 id="templates-title" className="font-semibold text-slate-800">Plantillas activas ({templates.length})</h2>
+              {templates.length === 0 ? <p className="mt-4 text-sm text-slate-500">No hay plantillas registradas.</p> : (
+                <ul className="mt-3 max-h-80 divide-y divide-slate-100 overflow-y-auto">
+                  {templates.map((template) => (
+                    <li key={template.id} className="py-3">
+                      <div className="flex items-center justify-between gap-3"><span className="font-medium text-slate-800">{template.nombre}</span><span className={`rounded-full px-2 py-1 text-xs font-semibold ${template.tipo === 'email' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{template.tipo_display}</span></div>
+                      <p className="mt-1 line-clamp-2 text-sm text-slate-500">{template.contenido}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 }
