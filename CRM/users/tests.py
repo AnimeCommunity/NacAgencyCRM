@@ -16,6 +16,17 @@ class UserSecurityTests(APITestCase):
             username="sales", password="StrongPass!2026", role="sales"
         )
 
+    def test_create_superuser_assigns_admin_role(self):
+        superuser = User.objects.create_superuser(
+            username="console-admin",
+            email="console-admin@example.com",
+            password="AnotherStrong!2026",
+        )
+
+        self.assertTrue(superuser.is_superuser)
+        self.assertTrue(superuser.is_staff)
+        self.assertEqual(superuser.role, "admin")
+
     def test_public_registration_forces_sales_role(self):
         response = self.client.post(
             "/api/register/",

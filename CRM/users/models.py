@@ -1,7 +1,15 @@
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models
 
+
+class CRMUserManager(UserManager):
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        extra_fields["role"] = "admin"
+        return super().create_superuser(username, email, password, **extra_fields)
+
+
 class User(AbstractUser):
+    objects = CRMUserManager()
 
     ROLE_CHOICES = (
         ('admin', 'Administrador'),
