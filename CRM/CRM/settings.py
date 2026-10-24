@@ -48,7 +48,7 @@ JWT_SIGNING_KEY = JWT_SIGNING_KEY or secrets.token_urlsafe(64)
 if IS_PRODUCTION and JWT_SIGNING_KEY == SECRET_KEY:
     raise ImproperlyConfigured("JWT_SIGNING_KEY must differ from DJANGO_SECRET_KEY.")
 
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1", "nacagencycrm.onrender.com")
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
 
 # Application definition
 INSTALLED_APPS = [
@@ -91,7 +91,7 @@ MIDDLEWARE = [
 
 # CORS se restringe a orígenes explícitos.
 CORS_ALLOWED_ORIGINS = env_list(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000", "http://nacagencycrm.onrender.com"
+    "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
 )
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", "")
 
@@ -186,7 +186,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CRM_SMTP_PASSWORD = os.getenv('CRM_SMTP_PASSWORD', '')
 CRM_SMTP_ENCRYPTION_KEY = os.getenv('CRM_SMTP_ENCRYPTION_KEY', '')
-CRM_SMTP_ALLOWED_HOSTS = env_list('CRM_SMTP_ALLOWED_HOSTS', 'nacagencycrm.onrender.com')
+CRM_SMTP_ALLOWED_HOSTS = env_list('CRM_SMTP_ALLOWED_HOSTS',)
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', IS_PRODUCTION)
