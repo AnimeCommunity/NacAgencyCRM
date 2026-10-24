@@ -155,10 +155,18 @@ if DB_ENGINE in {'postgres', 'postgresql', 'django.db.backends.postgresql'}:
         }
     }
 elif DB_ENGINE == 'sqlite':
+    sqlite_name = os.getenv('SQLITE_NAME', 'db.sqlite3').strip()
+    sqlite_path = Path(sqlite_name)
+    if not sqlite_path.is_absolute():
+        sqlite_path = BASE_DIR / sqlite_path
+
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / os.getenv('SQLITE_NAME', 'db.sqlite3'),
+            'NAME': sqlite_path,
+            'OPTIONS': {
+                'timeout': int(os.getenv('SQLITE_TIMEOUT', '30')),
+            },
         }
     }
 else:
