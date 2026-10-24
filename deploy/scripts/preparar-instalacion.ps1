@@ -130,9 +130,13 @@ Write-Host "Iniciando NacAgencyCRM..."
 docker compose `
     --env-file $EnvFile `
     -f $ComposeFile `
-    up -d --pull never
+    up -d --pull never --wait --wait-timeout 180
 
 if ($LASTEXITCODE -ne 0) {
+    docker compose `
+        --env-file $EnvFile `
+        -f $ComposeFile `
+        logs --no-color --tail 100
     throw "No fue posible iniciar NacAgencyCRM."
 }
 
