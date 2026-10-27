@@ -12,11 +12,13 @@ from pathlib import Path
 from unittest import skipUnless
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from windows_runtime import (
     APP_NAME,
     MAINTENANCE_MUTEX_NAMES,
+    TRIAL_ADMIN_PASSWORD_HASH,
+    TRIAL_ADMIN_USERNAME,
     AuthenticatedLocalControl,
     _create_exclusive_listener,
     _exclusive_file_lock,
@@ -32,6 +34,7 @@ from windows_runtime import (
     configure_environment,
     create_backup_bundle,
     ensure_runtime_config,
+    ensure_trial_admin,
     probe_running_instance,
     recover_pending_migration,
     resolve_runtime_paths,
@@ -39,6 +42,30 @@ from windows_runtime import (
     stop_running_instance,
     validate_backup_bundle,
 )
+
+
+class TrialAdminTests(TestCase):
+    def test_trial_admin_is_created_and_reset_to_known_admin_credentials(self):
+        user = ensure_trial_admin()
+
+        self.assertEqual(user.username, TRIAL_ADMIN_USERNAME)
+        self.assertEqual(user.role, "admin")
+        self.assertTrue(user.is_active)
+        self.assertTrue(user.is_staff)
+        self.assertTrue(user.is_superuser)
+        self.assertEqual(user.password, TRIAL_ADMIN_PASSWORD_HASH)
+
+        user.role = "sales"
+        user.is_superuser = False
+        user.set_password("temporary-different-password")
+        user.save()
+
+        updated = ensure_trial_admin()
+
+        self.assertEqual(updated.pk, user.pk)
+        self.assertEqual(updated.role, "admin")
+        self.assertTrue(updated.is_superuser)
+        self.assertEqual(updated.password, TRIAL_ADMIN_PASSWORD_HASH)
 
 
 class WindowsRuntimeTests(SimpleTestCase):

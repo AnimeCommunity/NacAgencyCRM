@@ -739,6 +739,19 @@ begin
     );
     Exit;
   end;
+  if not RunHiddenAndWait(
+    CandidateExe,
+    '--ensure-trial-admin --data-root ' + AddQuotes(CanonicalDataRoot) +
+      ' --installer-maintenance',
+    CandidateDirectory,
+    ResultCode
+  ) or (ResultCode <> 0) then
+  begin
+    Result := AbortAttempt(
+      'No fue posible crear el administrador predeterminado de la versión de prueba.'
+    );
+    Exit;
+  end;
   DataPrepared := True;
 end;
 

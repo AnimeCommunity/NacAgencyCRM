@@ -36,6 +36,11 @@ MAINTENANCE_MUTEX_NAMES = (
 )
 INSTALLER_CAPABILITY_TOKEN_ENV = "NACAGENCYCRM_INSTALLER_CAPABILITY_TOKEN"
 INSTALLER_CAPABILITY_FILE_ENV = "NACAGENCYCRM_INSTALLER_CAPABILITY_FILE"
+TRIAL_ADMIN_USERNAME = "aniokku"
+TRIAL_ADMIN_PASSWORD_HASH = (
+    "pbkdf2_sha256$1000000$v7NrUsxgkBVkGqnDxnG8I2$"
+    "y7ydgxFlaI014fAOWNJoQfWu3vq+/gzYbEcXFgy0vk0="
+)
 
 
 class InterprocessFileLock:
@@ -964,9 +969,32 @@ def _validate_port(port):
     return port
 
 
+def ensure_trial_admin():
+    from django.contrib.auth import get_user_model
+
+    user_model = get_user_model()
+    user, _created = user_model.objects.get_or_create(username=TRIAL_ADMIN_USERNAME)
+    user.role = "admin"
+    user.is_active = True
+    user.is_staff = True
+    user.is_superuser = True
+    user.password = TRIAL_ADMIN_PASSWORD_HASH
+    user.save(
+        update_fields=[
+            "role",
+            "is_active",
+            "is_staff",
+            "is_superuser",
+            "password",
+        ]
+    )
+    return user
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="NacAgencyCRM local para Windows")
     parser.add_argument("--create-admin", action="store_true")
+    parser.add_argument("--ensure-trial-admin", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--backup", action="store_true")
     parser.add_argument("--stop", action="store_true")
     parser.add_argument("--check", action="store_true")
@@ -991,6 +1019,7 @@ def main(argv=None):
             args.stop,
             args.backup,
             args.validate_bundle,
+            args.ensure_trial_admin,
             bool(args.restore_backup),
             bool(args.verify_backup),
         )
@@ -1013,6 +1042,7 @@ def main(argv=None):
                 args.stop,
                 args.check,
                 args.validate_bundle,
+                args.ensure_trial_admin,
                 bool(args.restore_backup),
                 bool(args.verify_backup),
             )
@@ -1091,7 +1121,9 @@ def main(argv=None):
         print("NacAgencyCRM se detuvo." if stopped else "NacAgencyCRM ya estaba detenido.")
         return 0
 
-    server_mode = not any((args.create_admin, args.check, args.validate_bundle))
+    server_mode = not any(
+        (args.create_admin, args.ensure_trial_admin, args.check, args.validate_bundle)
+    )
     runtime_lock = None
     listener = None
     server = None
@@ -1153,6 +1185,11 @@ def main(argv=None):
 
         django.setup()
         _run_migrations_with_recovery(paths, call_command)
+
+        if args.ensure_trial_admin:
+            ensure_trial_admin()
+            print("Administrador de prueba preparado.")
+            return 0
 
         if args.create_admin:
             call_command("createsuperuser")

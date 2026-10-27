@@ -62,6 +62,15 @@ class WindowsInstallerContractTests(SimpleTestCase):
         self.assertNotIn("RaiseException", cur_step_body)
         self.assertIn("InstallSucceeded := True", cur_step_body)
 
+    def test_installer_creates_trial_admin_after_publishing_canonical_data(self):
+        prepare = self.script.index("function PrepareToInstall")
+        prepare_end = self.script.index("procedure CurStepChanged", prepare)
+        prepare_body = self.script[prepare:prepare_end]
+        publish = prepare_body.rindex("--restore-backup")
+        create_admin = prepare_body.index("--ensure-trial-admin", publish)
+        self.assertLess(publish, create_admin)
+        self.assertIn("CanonicalDataRoot", prepare_body[create_admin : create_admin + 300])
+
     def test_installer_uses_explicit_canonical_data_root_and_backup_report(self):
         self.assertIn("--data-root", self.script)
         self.assertIn("--backup-report-file", self.script)
