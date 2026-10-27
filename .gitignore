@@ -29,12 +29,16 @@ deploy/installer/Output/
 # Distribution / packaging
 .Python
 build/
+.build/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
 lib/
+!frontendcrm/lib/
+!frontendcrm/lib/auth-path.mjs
+!frontendcrm/lib/auth-path.test.mjs
 lib64/
 parts/
 sdist/
@@ -51,6 +55,7 @@ MANIFEST
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+!deploy/windows/NacAgencyCRM.spec
 
 # Installer logs
 pip-log.txt

@@ -1,4 +1,4 @@
-from django.urls import include, path
+from django.urls import include, path, re_path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
@@ -9,6 +9,7 @@ from marketing.views import ConfigSMTPViewSet, PlantillaMensajeViewSet
 from proyectos.reports_views import InformeGerencialExportView, InformeGerencialView
 from proyectos.views import ProjectViewSet
 from users.views import CRMTokenObtainPairView, LogoutView, RegisterView, UserViewSet
+from .frontend import serve_frontend
 
 router = DefaultRouter()
 router.register(r"users", UserViewSet)
@@ -36,4 +37,5 @@ urlpatterns = [
         InformeGerencialExportView.as_view(),
         name="informe-gerencial-export",
     ),
+    re_path(r"^(?P<path>.*)$", serve_frontend, name="frontend"),
 ]

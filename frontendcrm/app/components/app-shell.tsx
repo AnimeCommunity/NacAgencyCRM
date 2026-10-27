@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { isAuthPath } from '@/lib/auth-path.mjs';
 import {
   apiService,
   getErrorMessage,
@@ -28,7 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [logoutError, setLogoutError] = useState('');
-  const isAuthPage = pathname === '/login' || pathname === '/register';
+  const isAuthPage = isAuthPath(pathname);
   const role = getSessionClaims()?.role;
 
   useEffect(() => {

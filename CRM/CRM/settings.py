@@ -189,6 +189,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+FRONTEND_DIST_DIR = Path(
+    os.getenv('FRONTEND_DIST_DIR', BASE_DIR.parent / 'frontendcrm' / 'out')
+)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

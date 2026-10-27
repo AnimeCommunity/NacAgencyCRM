@@ -307,10 +307,7 @@ export class ApiError extends Error {
   }
 }
 
-const configuredUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-if (!configuredUrl) {
-  throw new Error('NEXT_PUBLIC_API_URL debe definirse al iniciar o compilar el frontend.');
-}
+const configuredUrl = process.env.NEXT_PUBLIC_API_URL?.trim() || '/api';
 
 function normalizeApiBase(value: string): string {
   const withoutTrailingSlash = value.replace(/\/+$/, '');
