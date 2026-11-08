@@ -147,6 +147,20 @@ def export_management_report_xlsx(payload, querysets):
         )
     _style_sheet(weekly_sheet, {"A": 16, "B": 14, "C": 16, "D": 16, "E": 22})
 
+    daily_sheet = workbook.create_sheet("Actividad diaria")
+    daily_sheet.append(["Día", "Proyectos", "Cotizaciones", "Interacciones", "Ingresos aceptados"])
+    for row in payload["actividad_diaria"]:
+        daily_sheet.append(
+            [
+                row["periodo"],
+                row["proyectos"],
+                row["cotizaciones"],
+                row["interacciones"],
+                row["ingresos_aceptados"],
+            ]
+        )
+    _style_sheet(daily_sheet, {"A": 16, "B": 14, "C": 16, "D": 16, "E": 22})
+
     states_sheet = workbook.create_sheet("Estados")
     states_sheet.append(["Entidad", "Estado", "Cantidad"])
     for entity, key in (

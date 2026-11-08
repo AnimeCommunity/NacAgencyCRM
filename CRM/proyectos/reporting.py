@@ -1,5 +1,5 @@
 from django.db.models import Count, DecimalField, OuterRef, Q, Subquery, Sum
-from django.db.models.functions import TruncMonth, TruncWeek
+from django.db.models.functions import TruncDay, TruncMonth, TruncWeek
 from django.utils.dateparse import parse_date
 from rest_framework.exceptions import ValidationError
 
@@ -325,5 +325,6 @@ def build_management_report(params):
         "clientes_por_proyecto": clients_by_project,
         "actividad_mensual": _activity_rows(querysets, TruncMonth, "%Y-%m"),
         "actividad_semanal": _activity_rows(querysets, TruncWeek, "%Y-%m-%d"),
+        "actividad_diaria": _activity_rows(querysets, TruncDay, "%Y-%m-%d"),
     }
     return payload, querysets

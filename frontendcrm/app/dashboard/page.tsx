@@ -168,6 +168,18 @@ export default function AnalyticsDashboardPage() {
           </section>
 
           <div className="grid gap-6 xl:grid-cols-2">
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="daily-title">
+              <div className="border-b border-slate-200 p-4"><h2 id="daily-title" className="font-semibold text-slate-800">Actividad comercial por día</h2></div>
+              {report.actividad_diaria.length ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[620px] text-left text-sm">
+                    <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="p-3">Día</th><th className="p-3 text-center">Proyectos</th><th className="p-3 text-center">Cotizaciones</th><th className="p-3 text-center">Interacciones</th><th className="p-3 text-right">Ingresos</th></tr></thead>
+                    <tbody className="divide-y divide-slate-100">{report.actividad_diaria.map((row) => <tr key={row.periodo}><td className="p-3 font-semibold">{row.periodo}</td><td className="p-3 text-center">{row.proyectos}</td><td className="p-3 text-center">{row.cotizaciones}</td><td className="p-3 text-center">{row.interacciones}</td><td className="p-3 text-right font-semibold text-emerald-700">{currency(row.ingresos_aceptados)}</td></tr>)}</tbody>
+                  </table>
+                </div>
+              ) : <p className="p-8 text-center text-sm text-slate-500">No hay actividad diaria en el periodo seleccionado.</p>}
+            </section>
+
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" aria-labelledby="monthly-title">
               <div className="border-b border-slate-200 p-4"><h2 id="monthly-title" className="font-semibold text-slate-800">Actividad comercial por mes</h2></div>
               {report.actividad_mensual.length ? (

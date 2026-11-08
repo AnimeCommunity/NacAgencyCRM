@@ -291,6 +291,13 @@ export interface ManagementReport {
     interacciones: number;
     ingresos_aceptados: string | number;
   }>;
+  actividad_diaria: Array<{
+    periodo: string;
+    proyectos: number;
+    cotizaciones: number;
+    interacciones: number;
+    ingresos_aceptados: string | number;
+  }>;
 }
 
 type ErrorPayload = Record<string, unknown> | unknown[] | string | null;

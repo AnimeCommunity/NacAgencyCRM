@@ -350,6 +350,16 @@ class ManagerialReportTests(APITestCase):
         self.assertEqual(activity["proyectos"], 1)
         self.assertEqual(activity["interacciones"], 1)
         self.assertEqual(activity["cotizaciones"], 2)
+        current_day = date.today().isoformat()
+        daily_activity = next(
+            row for row in response.data["actividad_diaria"] if row["periodo"] == current_day
+        )
+        self.assertEqual(daily_activity["proyectos"], 1)
+        self.assertEqual(daily_activity["interacciones"], 1)
+        self.assertEqual(daily_activity["cotizaciones"], 2)
+        self.assertEqual(
+            Decimal(str(daily_activity["ingresos_aceptados"])), Decimal("119.00")
+        )
 
     def test_report_rejects_invalid_date_range(self):
         self.client.force_authenticate(self.sales)
@@ -531,8 +541,10 @@ class ManagerialReportTests(APITestCase):
                 "Interacciones",
                 "Actividad mensual",
                 "Actividad semanal",
+                "Actividad diaria",
                 "Estados",
                 "Resultados interacción",
             ],
         )
         self.assertEqual(workbook["Proyectos y clientes"]["B2"].value, "Evento")
+        self.assertEqual(workbook["Actividad diaria"]["A2"].value, date.today().isoformat())
